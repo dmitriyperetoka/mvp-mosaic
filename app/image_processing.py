@@ -1,21 +1,23 @@
 import base64
-import json
+import typing
 import zlib
 
 import cv2
 import numpy as np
 
 
-def bgr_to_rgb__hex(b: int, g: int, r: int) -> str:
+def bgr_to_rgb_hex(b: int, g: int, r: int) -> str:
     return f'{r:02x}{g:02x}{b:02x}'
 
 
-def img_to_mosaic_scheme(
+def make_mosaic_scheme(
     img: np.ndarray,
     grid_h: int,
     grid_w: int,
-    n_colors: int
-) -> str:
+    n_colors: int,
+    divider: int
+    
+) -> dict[str, typing.Any]:
     resized = cv2.resize(img, (grid_w, grid_h), interpolation=cv2.INTER_AREA)
     avg_colors = resized.reshape(-1, 3).astype(np.float32)
     
@@ -51,14 +53,14 @@ def img_to_mosaic_scheme(
         count = sum(bin(byte).count('1') for byte in mask_bytes)
         
         result_clusters.append({
-            "color": bgr_to_rgb__hex(*color),
+            "color": bgr_to_rgb_hex(*color),
             "count": count,
             "mask": base64.b64encode(zlib.compress(mask_bytes, level=9)).decode('ascii')
         })
-    
-    result = {
+
+    return {
+        "divider": divider,
+        "n_colors": n_colors,
         "grid": {"width": grid_w, "height": grid_h},
         "clusters": result_clusters
     }
-
-    return json.dumps(result, separators=(',', ':'))

@@ -6,7 +6,7 @@ class BaseValidator(BaseModel):
 
 
 class MosaicRefreshSchemeRequest(BaseValidator):
-    img_hash: str = Field(
+    image_hash: str = Field(
         min_length=64,
         max_length=64,
         examples=['6fcc1d052d571177bb73ac9059063d5e485d0f43477776a287d389782c4dca37'],

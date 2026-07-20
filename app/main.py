@@ -8,13 +8,19 @@ import cachetools
 import cv2
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 import image_processing as img_proc
 import validators
 
-DEFAULT_IMAGE_FP = 'media/default_image.jpg'
+DEFAULT_IMAGE_FP = 'static/default_image.jpg'
+
+os.makedirs("static", exist_ok=True)
+
+templates = Jinja2Templates(directory="app/templates")
 
 if not os.path.exists(DEFAULT_IMAGE_FP):
     raise RuntimeError(f'Не предоставлено дефолтное изображение по пути "{DEFAULT_IMAGE_FP}"')
@@ -29,12 +35,53 @@ mosaic_scheme_cache = cachetools.LFUCache(maxsize=3000)
 
 logger = logging.getLogger()
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 def get_image_by_hash(image_hash: str) -> typing.Optional[np.ndarray]:
     if image_hash == default_image_hash:
         return default_image
     return None
+
+
+def get_mosaic_scheme(img_hash: str, divider: int, n_colors: int):
+    img = get_image_by_hash(img_hash)
+    if img is None:
+        raise HTTPException(status_code=404, detail='Изображение не найдено')
+
+    img_height, img_width = img.shape[:2]
+    grid_h = img_height // divider
+    grid_w = img_width // divider
+    cache_key = f"{img_hash}_{grid_h}x{grid_w}_c{n_colors}"
+
+    if cache_key in mosaic_scheme_cache:
+        return mosaic_scheme_cache[cache_key]
+
+    scheme = img_proc.make_mosaic_scheme(
+        img=img,
+        grid_h=grid_h,
+        grid_w=grid_w,
+        n_colors=n_colors,
+        divider=divider
+    )
+    mosaic_scheme_cache[cache_key] = scheme
+    return scheme
+
+
+@app.get("/")
+async def get_index(request: Request):
+    image_url = "/static/default_image.jpg"
+    scheme = get_mosaic_scheme(default_image_hash, divider=15, n_colors=15)
+    return templates.TemplateResponse(
+        request,
+        "image_page.html",
+        {
+            "image_hash": default_image_hash,
+            "image_url": image_url,
+            "scheme": scheme
+        }
+    )
+
 
 @app.get('/health')
 async def health():
@@ -43,31 +90,11 @@ async def health():
 
 @app.post('/api/v1/mosaic/refresh-scheme')
 async def refresh_scheme(request: validators.MosaicRefreshSchemeRequest):
-    img_hash = request.img_hash
-    divider = request.divider
-    n_colors = request.n_colors
-
-    img = get_image_by_hash(img_hash)
-    if img is None:
-        raise HTTPException(status_code=404, detail='Изображение не найдено')
- 
     try:
-        img_height, img_width = img.shape[:2]
-        grid_h = img_height // divider
-        grid_w = img_width // divider
-        cache_key = f"{img_hash}_{grid_h}x{grid_w}_c{n_colors}"
-
-        if cache_key in mosaic_scheme_cache:
-            result_json = mosaic_scheme_cache[cache_key]
-        else:
-            result_json = img_proc.img_to_mosaic_scheme(
-                img=img,
-                grid_h=grid_h,
-                grid_w=grid_w,
-                n_colors=request.n_colors
-            )
-            mosaic_scheme_cache[cache_key] = result_json
-        return JSONResponse(content=json.loads(result_json))
+        scheme = get_mosaic_scheme(request.image_hash, request.divider, request.n_colors)
+        return JSONResponse(content=scheme)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(repr(e))
         raise HTTPException(status_code=500)
