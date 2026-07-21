@@ -1,28 +1,42 @@
 import hashlib
-import json
 import logging
-import os
 import typing
+import sys
+from pathlib import Path
 
 import cachetools
 import cv2
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-import image_processing as img_proc
-import validators
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEFAULT_IMAGE_FP = 'static/default_image.jpg'
+STATIC_DIR = BASE_DIR / 'static'
+TEMPLATES_DIR = BASE_DIR / 'app' / 'templates'
+DEFAULT_IMAGE_FP = STATIC_DIR / 'default_image.jpg'
 
-os.makedirs("static", exist_ok=True)
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
-templates = Jinja2Templates(directory="app/templates")
+sys.path.insert(0, str(BASE_DIR))
 
-if not os.path.exists(DEFAULT_IMAGE_FP):
+try:
+    from app import image_processing as img_proc
+    from app import validators
+except ImportError:
+    import image_processing as img_proc
+    import validators
+
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+if not DEFAULT_IMAGE_FP.exists():
     raise RuntimeError(f'Не предоставлено дефолтное изображение по пути "{DEFAULT_IMAGE_FP}"')
 
 with open(DEFAULT_IMAGE_FP, 'rb') as f:
@@ -35,7 +49,7 @@ mosaic_scheme_cache = cachetools.LFUCache(maxsize=3000)
 
 logger = logging.getLogger()
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 def get_image_by_hash(image_hash: str) -> typing.Optional[np.ndarray]:
@@ -102,7 +116,7 @@ async def refresh_scheme(request: validators.MosaicRefreshSchemeRequest):
 
 if __name__ == '__main__':
     uvicorn.run(
-        'main:app',
+        'app.main:app' if (BASE_DIR / 'app').exists() else 'main:app',
         host='0.0.0.0',
         port=8000,
         reload=True
