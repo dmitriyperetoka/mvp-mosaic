@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="version" content="v0.1.0">
+    <title>MvpMosaic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Шапка -->
+        <header class="mb-4">
+            <h1 class="h2 mb-0">MvpMosaic</h1>
+        </header>
+
+        <main>
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Оригинальное изображение</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="image-wrapper">
+                                <img id="originalImage" alt="Оригинал" class="img-fluid">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Мозаика</h5>
+                            <span id="mosaicStatus" class="badge bg-success">Готово</span>
+                        </div>
+                        <div class="card-body position-relative">
+                            <div class="image-wrapper">
+                                <canvas id="mosaicCanvas"></canvas>
+                                <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(255,255,255,0.75); z-index: 10; border-radius: 8px;">
+                                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                        <span class="visually-hidden">Загрузка...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Настройки -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row align-items-stretch">
+                                <!-- Левая часть: настройки -->
+                                <div class="col-md-10">
+                                    <form id="settingsForm">
+                                        <!-- Divider -->
+                                        <div class="row align-items-center mb-3">
+                                            <div class="col-md-2">
+                                                <label for="dividerSlider" class="form-label fw-bold mb-0">Масштаб:</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input type="range" id="dividerSlider" class="form-range" min="2" max="50" step="1" value="{{ scheme.divider }}">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="number" id="dividerInput" class="form-control" min="2" max="50" value="{{ scheme.divider }}">
+                                            </div>
+                                        </div>
+
+                                        <!-- n_colors -->
+                                        <div class="row align-items-center">
+                                            <div class="col-md-2">
+                                                <label for="colorsSlider" class="form-label fw-bold mb-0">Кол-во цветов:</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input type="range" id="colorsSlider" class="form-range" min="2" max="50" step="1" value="{{ scheme.n_colors }}">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="number" id="colorsInput" class="form-control" min="2" max="50" value="{{ scheme.n_colors }}">
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <!-- Правая часть: кнопка сброса на всю высоту -->
+                                <div class="col-md-2 d-flex align-items-stretch">
+                                    <button type="button" id="resetSettingsBtn" class="btn btn-outline-secondary w-100 h-100 d-flex align-items-center justify-content-center">
+                                        Сбросить<br>настройки
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🎨 Палитра цветов</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="colorPalette" class="d-flex flex-wrap gap-2">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="mt-4 text-center text-muted">
+            <small>
+                &copy; 2026 
+                <a href="https://github.com/katyaperetoka" target="_blank">katyaperetoka</a> |
+                <a href="https://github.com/dmitriyperetoka" target="_blank">dmitriyperetoka</a>
+            </small>
+        </footer>
+    </div>
+
+    <script>
+        window.__initialData = {
+            imageHash: "{{ image_hash }}",
+            imageUrl: "{{ image_url }}",
+            scheme: {{ scheme | tojson }}
+        };
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="/static/js/mosaic.js"></script>
+</body>
+</html>
