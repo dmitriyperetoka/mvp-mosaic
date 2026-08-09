@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="v0.1.0">
+    <meta name="version" content="v0.2.0">
     <title>MvpMosaic</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/style.css" rel="stylesheet">
@@ -18,27 +18,47 @@
         <main>
             <div class="row g-4 mb-4">
                 <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-header">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center py-2">
                             <h5 class="mb-0">Оригинальное изображение</h5>
+                            <div class="d-flex gap-2">
+                                <button id="resetImageBtn" class="btn btn-outline-secondary btn-sm" title="Сбросить к дефолтному изображению">
+                                    🔄 Сбросить
+                                </button>
+                                <button id="uploadBtn" class="btn btn-primary btn-sm">
+                                    📁 Загрузить
+                                </button>
+                            </div>
+                            <input type="file" id="fileInput" accept="image/*" style="display:none">
                         </div>
-                        <div class="card-body">
-                            <div class="image-wrapper">
+                        <div class="card-body d-flex align-items-center">
+                            <div class="image-wrapper w-100" id="dropZone">
                                 <img id="originalImage" alt="Оригинал" class="img-fluid">
+                                <div id="imageLoadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(255,255,255,0.75); z-index: 10; border-radius: 8px;">
+                                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                        <span class="visually-hidden">Загрузка...</span>
+                                    </div>
+                                </div>
+                                <div id="dropOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(0,0,0,0.5); z-index: 10; border-radius: 8px; color: white;">
+                                    <div class="text-center">
+                                        <div style="font-size: 3rem;">📤</div>
+                                        <div class="mt-2">Отпустите изображение</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center py-2">
                             <h5 class="mb-0">Мозаика</h5>
                             <span id="mosaicStatus" class="badge bg-success">Готово</span>
                         </div>
-                        <div class="card-body position-relative">
-                            <div class="image-wrapper">
+                        <div class="card-body position-relative d-flex align-items-center">
+                            <div class="image-wrapper w-100">
                                 <canvas id="mosaicCanvas"></canvas>
-                                <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(255,255,255,0.75); z-index: 10; border-radius: 8px;">
+                                <div id="mosaicLoadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(255,255,255,0.75); z-index: 10; border-radius: 8px;">
                                     <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
                                         <span class="visually-hidden">Загрузка...</span>
                                     </div>
@@ -55,38 +75,34 @@
                     <div class="card">
                         <div class="card-body">
                             <div class="row align-items-stretch">
-                                <!-- Левая часть: настройки -->
                                 <div class="col-md-10">
                                     <form id="settingsForm">
-                                        <!-- Divider -->
                                         <div class="row align-items-center mb-3">
                                             <div class="col-md-2">
                                                 <label for="dividerSlider" class="form-label fw-bold mb-0">Масштаб:</label>
                                             </div>
                                             <div class="col-md-8">
-                                                <input type="range" id="dividerSlider" class="form-range" min="2" max="50" step="1" value="{{ scheme.divider }}">
+                                                <input type="range" id="dividerSlider" class="form-range" min="2" max="50" step="1" value="15">
                                             </div>
                                             <div class="col-md-2">
-                                                <input type="number" id="dividerInput" class="form-control" min="2" max="50" value="{{ scheme.divider }}">
+                                                <input type="number" id="dividerInput" class="form-control" min="2" max="50" value="15">
                                             </div>
                                         </div>
 
-                                        <!-- n_colors -->
                                         <div class="row align-items-center">
                                             <div class="col-md-2">
                                                 <label for="colorsSlider" class="form-label fw-bold mb-0">Кол-во цветов:</label>
                                             </div>
                                             <div class="col-md-8">
-                                                <input type="range" id="colorsSlider" class="form-range" min="2" max="50" step="1" value="{{ scheme.n_colors }}">
+                                                <input type="range" id="colorsSlider" class="form-range" min="2" max="50" step="1" value="15">
                                             </div>
                                             <div class="col-md-2">
-                                                <input type="number" id="colorsInput" class="form-control" min="2" max="50" value="{{ scheme.n_colors }}">
+                                                <input type="number" id="colorsInput" class="form-control" min="2" max="50" value="15">
                                             </div>
                                         </div>
                                     </form>
                                 </div>
 
-                                <!-- Правая часть: кнопка сброса на всю высоту -->
                                 <div class="col-md-2 d-flex align-items-stretch">
                                     <button type="button" id="resetSettingsBtn" class="btn btn-outline-secondary w-100 h-100 d-flex align-items-center justify-content-center">
                                         Сбросить<br>настройки
@@ -124,8 +140,8 @@
 
     <script>
         window.__initialData = {
-            imageHash: "{{ image_hash }}",
-            imageUrl: "{{ image_url }}",
+            defaultImageUrl: "{{ default_image_url }}",
+            defaultImageHash: "{{ scheme.image_hash }}",
             scheme: {{ scheme | tojson }}
         };
     </script>

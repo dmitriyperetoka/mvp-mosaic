@@ -15,7 +15,8 @@ def make_mosaic_scheme(
     grid_h: int,
     grid_w: int,
     n_colors: int,
-    divider: int
+    divider: int,
+    image_hash: str
     
 ) -> dict[str, typing.Any]:
     resized = cv2.resize(img, (grid_w, grid_h), interpolation=cv2.INTER_AREA)
@@ -59,6 +60,7 @@ def make_mosaic_scheme(
         })
 
     return {
+        "image_hash": image_hash,
         "divider": divider,
         "n_colors": n_colors,
         "grid": {"width": grid_w, "height": grid_h},

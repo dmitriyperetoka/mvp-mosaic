@@ -25,12 +25,27 @@ body {
 .card-header {
     background: white;
     border-bottom: 1px solid #e9ecef;
-    padding: 12px 20px;
+    padding: 8px 20px; /* Уменьшили вертикальные отступы с 12px до 8px */
     font-weight: 600;
+    flex-shrink: 0;
+    min-height: 48px; /* Фиксированная минимальная высота для обеих карточек */
 }
 
 .card-body {
     padding: 20px;
+}
+
+/* ===== Одинаковая высота для карточек с изображениями ===== */
+.card.h-100 {
+    display: flex;
+    flex-direction: column;
+}
+
+.card.h-100 .card-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-height: 300px;
 }
 
 /* ===== Изображения ===== */
@@ -198,4 +213,38 @@ body {
     .row.align-items-stretch {
         align-items: flex-start;
     }
+}
+
+/* ===== Спиннеры загрузки ===== */
+#imageLoadingOverlay,
+#mosaicLoadingOverlay {
+    background: rgba(255, 255, 255, 0.8) !important;
+    border-radius: 8px;
+}
+
+#imageLoadingOverlay .spinner-border,
+#mosaicLoadingOverlay .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* ===== Кнопка сброса изображения ===== */
+#resetImageBtn {
+    white-space: nowrap;
+}
+
+#resetImageBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#resetImageBtn:hover:not(:disabled) {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+/* ===== Отключение DnD во время загрузки ===== */
+.image-wrapper.loading {
+    pointer-events: none;
+    opacity: 0.6;
 }
