@@ -1,45 +1,49 @@
-
 class MosaicApp {
     constructor(initialData) {
         // Данные
-        this.imageHash = initialData.imageHash;
-        this.imageUrl = initialData.imageUrl;
+        this.defaultImageHash = initialData.defaultImageHash;
+        this.defaultImageUrl = initialData.defaultImageUrl;
+        this.currentImageHash = initialData.scheme.image_hash;
+        this.currentImageUrl = initialData.defaultImageUrl;
         this.scheme = initialData.scheme;
         
         // Состояние
         this.isLoading = false;
-        this.divider = 10;
-        this.nColors = 16;
+        this.divider = 15;
+        this.nColors = 15;
         this.timers = {};
+        this.isDnDActive = false;
         
         // DOM-элементы
         this.originalImg = document.getElementById('originalImage');
         this.canvas = document.getElementById('mosaicCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.loadingOverlay = document.getElementById('loadingOverlay');
+        this.imageLoadingOverlay = document.getElementById('imageLoadingOverlay');
+        this.mosaicLoadingOverlay = document.getElementById('mosaicLoadingOverlay');
         this.mosaicStatus = document.getElementById('mosaicStatus');
         this.colorPalette = document.getElementById('colorPalette');
+        this.dropZone = document.getElementById('dropZone');
+        this.dropOverlay = document.getElementById('dropOverlay');
         
         // Элементы управления
         this.dividerSlider = document.getElementById('dividerSlider');
         this.dividerInput = document.getElementById('dividerInput');
         this.colorsSlider = document.getElementById('colorsSlider');
         this.colorsInput = document.getElementById('colorsInput');
+        this.uploadBtn = document.getElementById('uploadBtn');
+        this.fileInput = document.getElementById('fileInput');
+        this.resetBtn = document.getElementById('resetSettingsBtn');
+        this.resetImageBtn = document.getElementById('resetImageBtn');
         
         // Инициализация
         this.init();
     }
 
     init() {
-        this.originalImg.src = this.imageUrl;
+        this.originalImg.src = this.currentImageUrl;
         
-        this.divider = parseInt(this.dividerSlider.value) || 10;
-        this.nColors = parseInt(this.colorsSlider.value) || 16;
-        
-        this.dividerSlider.value = this.divider;
-        this.dividerInput.value = this.divider;
-        this.colorsSlider.value = this.nColors;
-        this.colorsInput.value = this.nColors;
+        this.divider = parseInt(this.dividerSlider.value) || 15;
+        this.nColors = parseInt(this.colorsSlider.value) || 15;
         
         this.drawMosaic(this.scheme);
         this.renderPalette(this.scheme);
@@ -154,10 +158,192 @@ class MosaicApp {
         });
 
         // ===== Кнопка сброса настроек =====
-        this.resetBtn = document.getElementById('resetSettingsBtn');
         this.resetBtn.addEventListener('click', () => {
             this.resetToDefaults();
         });
+
+        // ===== Кнопка сброса изображения =====
+        this.resetImageBtn.addEventListener('click', () => {
+            this.resetToDefaultImage();
+        });
+
+        // ===== Загрузка изображения =====
+        this.uploadBtn.addEventListener('click', () => {
+            this.fileInput.click();
+        });
+
+        this.fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.handleFileUpload(e.target.files[0]);
+            }
+            this.fileInput.value = '';
+        });
+
+        // ===== Drag & Drop =====
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+        });
+
+        // Обработчики для дроп-зоны
+        this.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!this.isDnDActive) {
+                this.isDnDActive = true;
+                this.dropOverlay.classList.remove('d-none');
+                this.dropOverlay.classList.add('d-flex');
+            }
+        });
+
+        this.dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Проверяем, что мы действительно покидаем зону, а не переходим на дочерний элемент
+            const relatedTarget = e.relatedTarget;
+            if (!this.dropZone.contains(relatedTarget)) {
+                this.isDnDActive = false;
+                this.dropOverlay.classList.add('d-none');
+                this.dropOverlay.classList.remove('d-flex');
+            }
+        });
+
+        this.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.isDnDActive = false;
+            this.dropOverlay.classList.add('d-none');
+            this.dropOverlay.classList.remove('d-flex');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('image/')) {
+                this.handleFileUpload(files[0]);
+            } else if (files.length > 0) {
+                alert('Пожалуйста, загрузите изображение');
+            }
+        });
+    }
+
+    async resetToDefaultImage() {
+        // Проверяем, не загружено ли уже дефолтное изображение
+        if (this.currentImageHash === this.defaultImageHash) {
+            return;
+        }
+
+        this.setLoadingState(true);
+        this.mosaicStatus.textContent = 'Сброс...';
+        this.mosaicStatus.className = 'badge bg-warning text-dark';
+
+        try {
+            const formData = new FormData();
+            formData.append('divider', this.divider);
+            formData.append('n_colors', this.nColors);
+
+            const response = await fetch('/api/v1/reset-to-default', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Ошибка сброса');
+            }
+
+            const data = await response.json();
+            
+            // Обновляем данные
+            this.currentImageHash = this.defaultImageHash;
+            this.currentImageUrl = data.image_url;
+            this.scheme = data.scheme;
+            
+            // Обновляем оригинальное изображение
+            this.originalImg.src = this.currentImageUrl;
+            
+            // Перерисовываем мозаику и палитру
+            this.drawMosaic(this.scheme);
+            this.renderPalette(this.scheme);
+            
+            this.mosaicStatus.textContent = 'Готово';
+            this.mosaicStatus.className = 'badge bg-success';
+            
+        } catch (error) {
+            console.error('Ошибка сброса:', error);
+            this.mosaicStatus.textContent = 'Ошибка';
+            this.mosaicStatus.className = 'badge bg-danger';
+            alert(error.message || 'Ошибка сброса к дефолтному изображению');
+        } finally {
+            this.setLoadingState(false);
+        }
+    }
+
+    async handleFileUpload(file) {
+        // Проверяем тип файла
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, загрузите изображение');
+            return;
+        }
+
+        // Проверяем размер
+        if (file.size > 20 * 1024 * 1024) {
+            alert('Файл слишком большой (макс. 20MB)');
+            return;
+        }
+
+        // Создаем FormData
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('divider', this.divider);
+        formData.append('n_colors', this.nColors);
+
+        this.setLoadingState(true);
+        this.mosaicStatus.textContent = 'Загрузка...';
+        this.mosaicStatus.className = 'badge bg-warning text-dark';
+
+        try {
+            const response = await fetch('/api/v1/upload-image', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Ошибка загрузки');
+            }
+
+            const data = await response.json();
+            
+            // Обновляем данные
+            this.currentImageHash = data.scheme.image_hash;
+            this.currentImageUrl = data.image_url;
+            this.scheme = data.scheme;
+            
+            // Обновляем оригинальное изображение
+            this.originalImg.src = this.currentImageUrl;
+            
+            // Перерисовываем мозаику и палитру
+            this.drawMosaic(this.scheme);
+            this.renderPalette(this.scheme);
+            
+            // Обновляем настройки (применяем те, что были отправлены)
+            this.dividerSlider.value = this.divider;
+            this.dividerInput.value = this.divider;
+            this.colorsSlider.value = this.nColors;
+            this.colorsInput.value = this.nColors;
+            
+            this.mosaicStatus.textContent = 'Готово';
+            this.mosaicStatus.className = 'badge bg-success';
+            
+        } catch (error) {
+            console.error('Ошибка загрузки:', error);
+            this.mosaicStatus.textContent = 'Ошибка';
+            this.mosaicStatus.className = 'badge bg-danger';
+            alert(error.message || 'Ошибка загрузки изображения');
+        } finally {
+            this.setLoadingState(false);
+        }
     }
 
     resetToDefaults() {
@@ -212,7 +398,7 @@ class MosaicApp {
         
         try {
             const payload = {
-                image_hash: this.imageHash,
+                image_hash: this.currentImageHash,
                 divider: divider,
                 n_colors: nColors
             };
@@ -252,48 +438,12 @@ class MosaicApp {
             console.error('Ошибка обновления схемы:', error);
             this.mosaicStatus.textContent = 'Ошибка';
             this.mosaicStatus.className = 'badge bg-danger';
-            throw error; // ← пробрасываем для catch в triggerRefresh
+            throw error;
         } finally {
             this.isLoading = false;
             this.setLoadingState(false);
         }
     }
-
-    validateAndRefresh(type) {
-        let input;
-        let currentValue;
-        
-        if (type === 'divider') {
-            input = this.dividerInput;
-            currentValue = this.divider;
-        } else {
-            input = this.colorsInput;
-            currentValue = this.nColors;
-        }
-        
-        const value = parseInt(input.value);
-        
-        if (isNaN(value) || value < 2 || value > 50) {
-            input.value = currentValue;
-            if (type === 'divider') {
-                this.dividerSlider.value = currentValue;
-            } else {
-                this.colorsSlider.value = currentValue;
-            }
-            return;
-        }
-        
-        if (type === 'divider') {
-            this.dividerSlider.value = value;
-            this.divider = value;
-        } else {
-            this.colorsSlider.value = value;
-            this.nColors = value;
-        }
-        
-        this.triggerRefresh(this.divider, this.nColors);
-    }
-
 
     drawMosaic(scheme) {
         const divider = this.divider;
@@ -463,21 +613,44 @@ class MosaicApp {
 
     setLoadingState(loading) {
         if (loading) {
-            this.loadingOverlay.classList.remove('d-none');
-            this.loadingOverlay.classList.add('d-flex');
+            // Показываем спиннеры на обоих изображениях
+            this.imageLoadingOverlay.classList.remove('d-none');
+            this.imageLoadingOverlay.classList.add('d-flex');
+            this.mosaicLoadingOverlay.classList.remove('d-none');
+            this.mosaicLoadingOverlay.classList.add('d-flex');
+            
+            // Блокируем все элементы управления
             this.dividerSlider.disabled = true;
             this.dividerInput.disabled = true;
             this.colorsSlider.disabled = true;
             this.colorsInput.disabled = true;
-            this.mosaicStatus.textContent = 'Загрузка...';
-            this.mosaicStatus.className = 'badge bg-warning text-dark';
+            this.uploadBtn.disabled = true;
+            this.resetBtn.disabled = true;
+            this.resetImageBtn.disabled = true;
+            
+            // Блокируем DnD
+            this.dropZone.style.pointerEvents = 'none';
+            this.dropZone.style.opacity = '0.6';
+            
         } else {
-            this.loadingOverlay.classList.add('d-none');
-            this.loadingOverlay.classList.remove('d-flex');
+            // Скрываем спиннеры
+            this.imageLoadingOverlay.classList.add('d-none');
+            this.imageLoadingOverlay.classList.remove('d-flex');
+            this.mosaicLoadingOverlay.classList.add('d-none');
+            this.mosaicLoadingOverlay.classList.remove('d-flex');
+            
+            // Разблокируем все элементы управления
             this.dividerSlider.disabled = false;
             this.dividerInput.disabled = false;
             this.colorsSlider.disabled = false;
             this.colorsInput.disabled = false;
+            this.uploadBtn.disabled = false;
+            this.resetBtn.disabled = false;
+            this.resetImageBtn.disabled = false;
+            
+            // Разблокируем DnD
+            this.dropZone.style.pointerEvents = 'auto';
+            this.dropZone.style.opacity = '1';
         }
     }
 }
