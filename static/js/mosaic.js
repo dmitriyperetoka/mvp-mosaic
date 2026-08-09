@@ -259,8 +259,8 @@ class MosaicApp {
             this.currentImageUrl = data.image_url;
             this.scheme = data.scheme;
             
-            // Обновляем оригинальное изображение
-            this.originalImg.src = this.currentImageUrl;
+            // Обновляем оригинальное изображение с предзагрузкой
+            await this.loadImage(this.currentImageUrl);
             
             // Перерисовываем мозаику и палитру
             this.drawMosaic(this.scheme);
@@ -320,8 +320,8 @@ class MosaicApp {
             this.currentImageUrl = data.image_url;
             this.scheme = data.scheme;
             
-            // Обновляем оригинальное изображение
-            this.originalImg.src = this.currentImageUrl;
+            // Обновляем оригинальное изображение с предзагрузкой
+            await this.loadImage(this.currentImageUrl);
             
             // Перерисовываем мозаику и палитру
             this.drawMosaic(this.scheme);
@@ -344,6 +344,28 @@ class MosaicApp {
         } finally {
             this.setLoadingState(false);
         }
+    }
+
+    loadImage(url) {
+        return new Promise((resolve, reject) => {
+            // Создаем временный Image объект для предзагрузки
+            const img = new Image();
+            
+            img.onload = () => {
+                // Когда изображение загрузилось, устанавливаем его в основной элемент
+                this.originalImg.src = url;
+                resolve();
+            };
+            
+            img.onerror = () => {
+                // Если не удалось загрузить, пробуем установить напрямую
+                this.originalImg.src = url;
+                reject(new Error('Не удалось загрузить изображение'));
+            };
+            
+            // Начинаем загрузку
+            img.src = url;
+        });
     }
 
     resetToDefaults() {
