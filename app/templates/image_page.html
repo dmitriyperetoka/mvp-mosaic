@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="v0.2.2">
     <title>MvpMosaic</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/style.css" rel="stylesheet">
@@ -77,23 +76,51 @@
                             <div class="row align-items-stretch">
                                 <div class="col-md-10">
                                     <form id="settingsForm">
+                                        <!-- Ширина полотна -->
                                         <div class="row align-items-center mb-3">
-                                            <div class="col-md-2">
-                                                <label for="dividerSlider" class="form-label fw-bold mb-0">Масштаб:</label>
+                                            <div class="col-md-3">
+                                                <label for="canvasWidthSlider" class="form-label fw-bold mb-0">Ширина полотна:</label>
                                             </div>
-                                            <div class="col-md-8">
-                                                <input type="range" id="dividerSlider" class="form-range" min="2" max="50" step="1" value="15">
+                                            <div class="col-md-7">
+                                                <input type="range" id="canvasWidthSlider" class="form-range" min="200" max="5000" step="1" value="1000">
                                             </div>
                                             <div class="col-md-2">
-                                                <input type="number" id="dividerInput" class="form-control" min="2" max="50" value="15">
+                                                <input type="number" id="canvasWidthInput" class="form-control" min="200" max="5000" value="1000">
                                             </div>
                                         </div>
 
-                                        <div class="row align-items-center">
+                                        <!-- Размер ячейки -->
+                                        <div class="row align-items-center mb-3">
+                                            <div class="col-md-3">
+                                                <label for="cellSizeSlider" class="form-label fw-bold mb-0">Размер ячейки:</label>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input type="range" id="cellSizeSlider" class="form-range" min="5" max="50" step="1" value="15">
+                                            </div>
                                             <div class="col-md-2">
+                                                <input type="number" id="cellSizeInput" class="form-control" min="5" max="50" value="15">
+                                            </div>
+                                        </div>
+
+                                        <!-- Ширина шва -->
+                                        <div class="row align-items-center mb-3">
+                                            <div class="col-md-3">
+                                                <label for="gapSlider" class="form-label fw-bold mb-0">Ширина шва:</label>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input type="range" id="gapSlider" class="form-range" min="0" max="10" step="1" value="2">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="number" id="gapInput" class="form-control" min="0" max="10" value="2">
+                                            </div>
+                                        </div>
+
+                                        <!-- Количество цветов -->
+                                        <div class="row align-items-center">
+                                            <div class="col-md-3">
                                                 <label for="colorsSlider" class="form-label fw-bold mb-0">Кол-во цветов:</label>
                                             </div>
-                                            <div class="col-md-8">
+                                            <div class="col-md-7">
                                                 <input type="range" id="colorsSlider" class="form-range" min="2" max="50" step="1" value="15">
                                             </div>
                                             <div class="col-md-2">
@@ -114,11 +141,46 @@
                 </div>
             </div>
 
+            <!-- Сводка -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">🎨 Палитра цветов</h5>
+                            <h5 class="mb-0">📊 Сводка</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="fw-bold text-muted small">Размеры полотна</div>
+                                    <div>
+                                        <span id="summaryCanvasWidth" style="font-weight: 600; color: #0d6efd;">--</span> × 
+                                        <span id="summaryCanvasHeight" style="font-weight: 600; color: #0d6efd;">--</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="fw-bold text-muted small">Размер ячейки</div>
+                                    <div><span id="summaryCellSize" style="font-weight: 600; color: #0d6efd;">--</span></div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="fw-bold text-muted small">Всего ячеек</div>
+                                    <div><span id="summaryTotalCells" style="font-weight: 600; color: #0d6efd;">--</span></div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="fw-bold text-muted small">Ширина шва</div>
+                                    <div><span id="summaryGap" style="font-weight: 600; color: #0d6efd;">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Палитра -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🎨 Палитра (<span id="paletteColorCount">{{ scheme.n_colors }}</span> цветов)</h5>
                         </div>
                         <div class="card-body">
                             <div id="colorPalette" class="d-flex flex-wrap gap-2">
@@ -132,7 +194,6 @@
         <footer class="mt-4 text-center text-muted">
             <small>
                 &copy; 2026 
-                <a href="https://github.com/katyaperetoka" target="_blank">katyaperetoka</a> |
                 <a href="https://github.com/dmitriyperetoka" target="_blank">dmitriyperetoka</a>
             </small>
         </footer>
