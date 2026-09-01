@@ -1,20 +1,20 @@
+
 class MosaicApp {
     constructor(initialData) {
-        // Данные
         this.defaultImageHash = initialData.defaultImageHash;
         this.defaultImageUrl = initialData.defaultImageUrl;
         this.currentImageHash = initialData.scheme.image_hash;
         this.currentImageUrl = initialData.defaultImageUrl;
         this.scheme = initialData.scheme;
         
-        // Состояние
         this.isLoading = false;
-        this.divider = 15;
+        this.canvasWidthMm = 1000;
+        this.cellSizeMm = 15;
+        this.gapMm = 2;
         this.nColors = 15;
         this.timers = {};
         this.isDnDActive = false;
-        
-        // DOM-элементы
+
         this.originalImg = document.getElementById('originalImage');
         this.canvas = document.getElementById('mosaicCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -25,9 +25,12 @@ class MosaicApp {
         this.dropZone = document.getElementById('dropZone');
         this.dropOverlay = document.getElementById('dropOverlay');
         
-        // Элементы управления
-        this.dividerSlider = document.getElementById('dividerSlider');
-        this.dividerInput = document.getElementById('dividerInput');
+        this.canvasWidthSlider = document.getElementById('canvasWidthSlider');
+        this.canvasWidthInput = document.getElementById('canvasWidthInput');
+        this.cellSizeSlider = document.getElementById('cellSizeSlider');
+        this.cellSizeInput = document.getElementById('cellSizeInput');
+        this.gapSlider = document.getElementById('gapSlider');
+        this.gapInput = document.getElementById('gapInput');
         this.colorsSlider = document.getElementById('colorsSlider');
         this.colorsInput = document.getElementById('colorsInput');
         this.uploadBtn = document.getElementById('uploadBtn');
@@ -35,76 +38,192 @@ class MosaicApp {
         this.resetBtn = document.getElementById('resetSettingsBtn');
         this.resetImageBtn = document.getElementById('resetImageBtn');
         
-        // Инициализация
+        this.summaryCanvasWidth = document.getElementById('summaryCanvasWidth');
+        this.summaryCanvasHeight = document.getElementById('summaryCanvasHeight');
+        this.summaryCellSize = document.getElementById('summaryCellSize');
+        this.summaryTotalCells = document.getElementById('summaryTotalCells');
+        this.summaryGap = document.getElementById('summaryGap');
+        this.summaryColors = document.getElementById('summaryColors');
+        
         this.init();
     }
 
     init() {
         this.originalImg.src = this.currentImageUrl;
-        
-        this.divider = parseInt(this.dividerSlider.value) || 15;
-        this.nColors = parseInt(this.colorsSlider.value) || 15;
-        
+
+        this.canvasWidthSlider.value = this.scheme.actual_size.width_mm
+        this.canvasWidthInput.value = this.scheme.actual_size.width_mm
+        this.canvasWidthMm = this.scheme.actual_size.width_mm;
+        this.cellSizeMm = this.scheme.cell_size_mm;
+        this.gapMm = this.scheme.gap_mm;
+        this.nColors = this.scheme.n_colors;
+
         this.drawMosaic(this.scheme);
         this.renderPalette(this.scheme);
+        this.updateSummary(this.scheme);
         this.bindEvents();
     }
 
     bindEvents() {
-        // ===== Divider слайдер =====
-        this.dividerSlider.addEventListener('input', () => {
-            const value = parseInt(this.dividerSlider.value);
-            this.dividerInput.value = value;
+        this.canvasWidthSlider.addEventListener('input', () => {
+            const value = parseInt(this.canvasWidthSlider.value);
+            this.canvasWidthInput.value = value;
         });
         
-        this.dividerSlider.addEventListener('change', () => {
-            const value = parseInt(this.dividerSlider.value);
-            this.dividerInput.value = value;
-            this.triggerRefresh(value, this.nColors);
+        this.canvasWidthSlider.addEventListener('change', () => {
+            const value = parseInt(this.canvasWidthSlider.value);
+            this.canvasWidthInput.value = value;
+            this.triggerRefresh(value, this.cellSizeMm, this.gapMm, this.nColors);
         });
 
-        // ===== Divider поле ввода =====
-        this.dividerInput.addEventListener('input', () => {
-            const value = parseInt(this.dividerInput.value);
-            if (!isNaN(value) && value >= 2 && value <= 50) {
-                this.dividerSlider.value = value;
-                clearTimeout(this.timers.divider);
-                this.timers.divider = setTimeout(() => {
-                    this.triggerRefresh(value, this.nColors);
+        this.canvasWidthInput.addEventListener('input', () => {
+            const value = parseInt(this.canvasWidthInput.value);
+            if (!isNaN(value) && value >= 200 && value <= 5000) {
+                this.canvasWidthSlider.value = value;
+                clearTimeout(this.timers.canvasWidth);
+                this.timers.canvasWidth = setTimeout(() => {
+                    this.triggerRefresh(value, this.cellSizeMm, this.gapMm, this.nColors);
                 }, 1000);
             }
         });
         
-        this.dividerInput.addEventListener('blur', () => {
-            const rawValue = parseInt(this.dividerInput.value);
+        this.canvasWidthInput.addEventListener('blur', () => {
+            const rawValue = parseInt(this.canvasWidthInput.value);
             let value = rawValue;
             
             if (isNaN(rawValue)) {
-                this.dividerInput.value = this.divider;
-                this.dividerSlider.value = this.divider;
+                this.canvasWidthInput.value = this.canvasWidthMm;
+                this.canvasWidthSlider.value = this.canvasWidthMm;
                 return;
             }
             
-            if (value < 2) value = 2;
-            if (value > 50) value = 50;
+            if (value < 200) value = 200;
+            if (value > 5000) value = 5000;
             
-            this.dividerInput.value = value;
-            this.dividerSlider.value = value;
+            this.canvasWidthInput.value = value;
+            this.canvasWidthSlider.value = value;
             
-            if (value !== this.divider) {
-                clearTimeout(this.timers.divider);
-                this.triggerRefresh(value, this.nColors);
-            }
-        });
-        
-        this.dividerInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.dividerInput.blur();
+            if (value !== this.canvasWidthMm) {
+                clearTimeout(this.timers.canvasWidth);
+                this.triggerRefresh(value, this.cellSizeMm, this.gapMm, this.nColors);
             }
         });
 
-        // ===== Colors слайдер =====
+        this.canvasWidthInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.canvasWidthInput.blur();
+            }
+        });
+
+        this.cellSizeSlider.addEventListener('input', () => {
+            const value = parseInt(this.cellSizeSlider.value);
+            this.cellSizeInput.value = value;
+        });
+        
+        this.cellSizeSlider.addEventListener('change', () => {
+            const value = parseInt(this.cellSizeSlider.value);
+            this.cellSizeInput.value = value;
+            this.syncCanvasWidth(this.canvasWidthMm);
+            this.triggerRefresh(this.canvasWidthMm, value, this.gapMm, this.nColors);
+        });
+
+        this.cellSizeInput.addEventListener('input', () => {
+            const value = parseInt(this.cellSizeInput.value);
+            if (!isNaN(value) && value >= 5 && value <= 50) {
+                this.cellSizeSlider.value = value;
+                clearTimeout(this.timers.cellSize);
+                this.timers.cellSize = setTimeout(() => {
+                    this.syncCanvasWidth(this.canvasWidthMm);
+                    this.triggerRefresh(this.canvasWidthMm, value, this.gapMm, this.nColors);
+                }, 1000);
+            }
+        });
+        
+        this.cellSizeInput.addEventListener('blur', () => {
+            const rawValue = parseInt(this.cellSizeInput.value);
+            let value = rawValue;
+            
+            if (isNaN(rawValue)) {
+                this.cellSizeInput.value = this.cellSizeMm;
+                this.cellSizeSlider.value = this.cellSizeMm;
+                return;
+            }
+            
+            if (value < 5) value = 5;
+            if (value > 50) value = 50;
+            
+            this.cellSizeInput.value = value;
+            this.cellSizeSlider.value = value;
+            
+            if (value !== this.cellSizeMm) {
+                clearTimeout(this.timers.cellSize);
+                this.syncCanvasWidth(this.canvasWidthMm);
+                this.triggerRefresh(this.canvasWidthMm, value, this.gapMm, this.nColors);
+            }
+        });
+
+        this.cellSizeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.cellSizeInput.blur();
+            }
+        });
+
+        this.gapSlider.addEventListener('input', () => {
+            const value = parseInt(this.gapSlider.value);
+            this.gapInput.value = value;
+        });
+        
+        this.gapSlider.addEventListener('change', () => {
+            const value = parseInt(this.gapSlider.value);
+            this.gapInput.value = value;
+            this.syncCanvasWidth(this.canvasWidthMm);
+            this.triggerRefresh(this.canvasWidthMm, this.cellSizeMm, value, this.nColors);
+        });
+
+        this.gapInput.addEventListener('input', () => {
+            const value = parseInt(this.gapInput.value);
+            if (!isNaN(value) && value >= 0 && value <= 10) {
+                this.gapSlider.value = value;
+                clearTimeout(this.timers.gap);
+                this.timers.gap = setTimeout(() => {
+                    this.syncCanvasWidth(this.canvasWidthMm);
+                    this.triggerRefresh(this.canvasWidthMm, this.cellSizeMm, value, this.nColors);
+                }, 1000);
+            }
+        });
+        
+        this.gapInput.addEventListener('blur', () => {
+            const rawValue = parseInt(this.gapInput.value);
+            let value = rawValue;
+            
+            if (isNaN(rawValue)) {
+                this.gapInput.value = this.gapMm;
+                this.gapSlider.value = this.gapMm;
+                return;
+            }
+            
+            if (value < 0) value = 0;
+            if (value > 10) value = 10;
+            
+            this.gapInput.value = value;
+            this.gapSlider.value = value;
+            
+            if (value !== this.gapMm) {
+                clearTimeout(this.timers.gap);
+                this.syncCanvasWidth(this.canvasWidthMm);
+                this.triggerRefresh(this.canvasWidthMm, this.cellSizeMm, value, this.nColors);
+            }
+        });
+
+        this.gapInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.gapInput.blur();
+            }
+        });
+
         this.colorsSlider.addEventListener('input', () => {
             const value = parseInt(this.colorsSlider.value);
             this.colorsInput.value = value;
@@ -113,17 +232,16 @@ class MosaicApp {
         this.colorsSlider.addEventListener('change', () => {
             const value = parseInt(this.colorsSlider.value);
             this.colorsInput.value = value;
-            this.triggerRefresh(this.divider, value);
+            this.triggerRefresh(this.canvasWidthMm, this.cellSizeMm, this.gapMm, value);
         });
 
-        // ===== Colors поле ввода =====
         this.colorsInput.addEventListener('input', () => {
             const value = parseInt(this.colorsInput.value);
             if (!isNaN(value) && value >= 2 && value <= 50) {
                 this.colorsSlider.value = value;
                 clearTimeout(this.timers.colors);
                 this.timers.colors = setTimeout(() => {
-                    this.triggerRefresh(this.divider, value);
+                    this.triggerRefresh(this.canvasWidthMm, this.cellSizeMm, this.gapMm, value);
                 }, 1000);
             }
         });
@@ -146,10 +264,10 @@ class MosaicApp {
             
             if (value !== this.nColors) {
                 clearTimeout(this.timers.colors);
-                this.triggerRefresh(this.divider, value);
+                this.triggerRefresh(this.canvasWidthMm, this.cellSizeMm, this.gapMm, value);
             }
         });
-        
+
         this.colorsInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -157,17 +275,14 @@ class MosaicApp {
             }
         });
 
-        // ===== Кнопка сброса настроек =====
         this.resetBtn.addEventListener('click', () => {
             this.resetToDefaults();
         });
 
-        // ===== Кнопка сброса изображения =====
         this.resetImageBtn.addEventListener('click', () => {
             this.resetToDefaultImage();
         });
 
-        // ===== Загрузка изображения =====
         this.uploadBtn.addEventListener('click', () => {
             this.fileInput.click();
         });
@@ -179,7 +294,6 @@ class MosaicApp {
             this.fileInput.value = '';
         });
 
-        // ===== Drag & Drop =====
         document.addEventListener('dragover', (e) => {
             e.preventDefault();
         });
@@ -188,7 +302,6 @@ class MosaicApp {
             e.preventDefault();
         });
 
-        // Обработчики для дроп-зоны
         this.dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -202,7 +315,6 @@ class MosaicApp {
         this.dropZone.addEventListener('dragleave', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            // Проверяем, что мы действительно покидаем зону, а не переходим на дочерний элемент
             const relatedTarget = e.relatedTarget;
             if (!this.dropZone.contains(relatedTarget)) {
                 this.isDnDActive = false;
@@ -227,8 +339,139 @@ class MosaicApp {
         });
     }
 
+    syncCanvasWidth(currentWidth) {
+        const step = this.cellSizeMm + this.gapMm;
+        let newValue = Math.ceil(currentWidth / step) * step - this.gapMm;
+        if (newValue < 200) newValue = 200;
+        if (newValue > 5000) newValue = 5000;
+        
+        this.canvasWidthMm = newValue;
+        this.canvasWidthSlider.value = newValue;
+        this.canvasWidthInput.value = newValue;
+    }
+
+    resetToDefaults() {
+        const defaultCanvasWidth = 1001;
+        const defaultCellSize = 15;
+        const defaultGap = 2;
+        const defaultColors = 15;
+        
+        if (this.canvasWidthMm === defaultCanvasWidth && 
+            this.cellSizeMm === defaultCellSize && 
+            this.gapMm === defaultGap && 
+            this.nColors === defaultColors) {
+            return;
+        }
+        
+        this.canvasWidthSlider.value = defaultCanvasWidth;
+        this.canvasWidthInput.value = defaultCanvasWidth;
+        this.cellSizeSlider.value = defaultCellSize;
+        this.cellSizeInput.value = defaultCellSize;
+        this.gapSlider.value = defaultGap;
+        this.gapInput.value = defaultGap;
+        this.colorsSlider.value = defaultColors;
+        this.colorsInput.value = defaultColors;
+
+        this.triggerRefresh(defaultCanvasWidth, defaultCellSize, defaultGap, defaultColors);
+    }
+
+    triggerRefresh(canvasWidth, cellSize, gap, nColors) {
+        if (canvasWidth === this.canvasWidthMm && 
+            cellSize === this.cellSizeMm && 
+            gap === this.gapMm && 
+            nColors === this.nColors) {
+            return;
+        }
+
+        const oldCanvasWidth = this.canvasWidthMm;
+        const oldCellSize = this.cellSizeMm;
+        const oldGap = this.gapMm;
+        const oldNColors = this.nColors;
+        
+        this.canvasWidthMm = canvasWidth;
+        this.cellSizeMm = cellSize;
+        this.gapMm = gap;
+        this.nColors = nColors;
+        
+        this.canvasWidthSlider.value = canvasWidth;
+        this.canvasWidthInput.value = canvasWidth;
+        this.cellSizeSlider.value = cellSize;
+        this.cellSizeInput.value = cellSize;
+        this.gapSlider.value = gap;
+        this.gapInput.value = gap;
+        this.colorsSlider.value = nColors;
+        this.colorsInput.value = nColors;
+        
+        this.refreshScheme(canvasWidth, cellSize, gap, nColors).catch(() => {
+            this.canvasWidthMm = oldCanvasWidth;
+            this.cellSizeMm = oldCellSize;
+            this.gapMm = oldGap;
+            this.nColors = oldNColors;
+            this.canvasWidthSlider.value = oldCanvasWidth;
+            this.canvasWidthInput.value = oldCanvasWidth;
+            this.cellSizeSlider.value = oldCellSize;
+            this.cellSizeInput.value = oldCellSize;
+            this.gapSlider.value = oldGap;
+            this.gapInput.value = oldGap;
+            this.colorsSlider.value = oldNColors;
+            this.colorsInput.value = oldNColors;
+        });
+    }
+
+    async refreshScheme(canvasWidth, cellSize, gap, nColors) {
+        if (this.isLoading) return;
+        
+        this.isLoading = true;
+        this.setLoadingState(true);
+        
+        try {
+            const payload = {
+                image_hash: this.currentImageHash,
+                canvas_width_mm: canvasWidth,
+                cell_size_mm: cellSize,
+                gap_mm: gap,
+                n_colors: nColors
+            };
+            
+            const response = await fetch('/api/v1/mosaic/refresh-scheme', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Ошибка сервера');
+            }
+            
+            const newScheme = await response.json();
+            
+            this.scheme = newScheme;
+            
+            // Синхронизируем ширину полотна с фактическим значением
+            this.syncCanvasWidth(newScheme.actual_size.width_mm);
+            
+            this.drawMosaic(newScheme);
+            this.renderPalette(newScheme);
+            this.updateSummary(newScheme);
+            
+            this.mosaicStatus.textContent = 'Обновлено';
+            this.mosaicStatus.className = 'badge bg-success';
+            
+        } catch (error) {
+            console.error('Ошибка обновления схемы:', error);
+            this.mosaicStatus.textContent = 'Ошибка';
+            this.mosaicStatus.className = 'badge bg-danger';
+            throw error;
+        } finally {
+            this.isLoading = false;
+            this.setLoadingState(false);
+        }
+    }
+
     async resetToDefaultImage() {
-        // Проверяем, не загружено ли уже дефолтное изображение
         if (this.currentImageHash === this.defaultImageHash) {
             return;
         }
@@ -239,10 +482,12 @@ class MosaicApp {
 
         try {
             const formData = new FormData();
-            formData.append('divider', this.divider);
+            formData.append('canvas_width_mm', this.canvasWidthMm);
+            formData.append('cell_size_mm', this.cellSizeMm);
+            formData.append('gap_mm', this.gapMm);
             formData.append('n_colors', this.nColors);
 
-            const response = await fetch('/api/v1/reset-to-default', {
+            const response = await fetch('/api/v1/reset-to-default-image', {
                 method: 'POST',
                 body: formData
             });
@@ -253,18 +498,16 @@ class MosaicApp {
             }
 
             const data = await response.json();
-            
-            // Обновляем данные
+
             this.currentImageHash = this.defaultImageHash;
             this.currentImageUrl = data.image_url;
             this.scheme = data.scheme;
-            
-            // Обновляем оригинальное изображение с предзагрузкой
+
             await this.loadImage(this.currentImageUrl);
-            
-            // Перерисовываем мозаику и палитру
+
             this.drawMosaic(this.scheme);
             this.renderPalette(this.scheme);
+            this.updateSummary(this.scheme);
             
             this.mosaicStatus.textContent = 'Готово';
             this.mosaicStatus.className = 'badge bg-success';
@@ -280,22 +523,21 @@ class MosaicApp {
     }
 
     async handleFileUpload(file) {
-        // Проверяем тип файла
         if (!file.type.startsWith('image/')) {
             alert('Пожалуйста, загрузите изображение');
             return;
         }
 
-        // Проверяем размер
         if (file.size > 20 * 1024 * 1024) {
             alert('Файл слишком большой (макс. 20MB)');
             return;
         }
 
-        // Создаем FormData
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('divider', this.divider);
+        formData.append('canvas_width_mm', this.canvasWidthMm);
+        formData.append('cell_size_mm', this.cellSizeMm);
+        formData.append('gap_mm', this.gapMm);
         formData.append('n_colors', this.nColors);
 
         this.setLoadingState(true);
@@ -315,23 +557,15 @@ class MosaicApp {
 
             const data = await response.json();
             
-            // Обновляем данные
             this.currentImageHash = data.scheme.image_hash;
             this.currentImageUrl = data.image_url;
             this.scheme = data.scheme;
             
-            // Обновляем оригинальное изображение с предзагрузкой
             await this.loadImage(this.currentImageUrl);
             
-            // Перерисовываем мозаику и палитру
             this.drawMosaic(this.scheme);
             this.renderPalette(this.scheme);
-            
-            // Обновляем настройки (применяем те, что были отправлены)
-            this.dividerSlider.value = this.divider;
-            this.dividerInput.value = this.divider;
-            this.colorsSlider.value = this.nColors;
-            this.colorsInput.value = this.nColors;
+            this.updateSummary(this.scheme);
             
             this.mosaicStatus.textContent = 'Готово';
             this.mosaicStatus.className = 'badge bg-success';
@@ -348,138 +582,44 @@ class MosaicApp {
 
     loadImage(url) {
         return new Promise((resolve, reject) => {
-            // Создаем временный Image объект для предзагрузки
             const img = new Image();
             
             img.onload = () => {
-                // Когда изображение загрузилось, устанавливаем его в основной элемент
                 this.originalImg.src = url;
                 resolve();
             };
             
             img.onerror = () => {
-                // Если не удалось загрузить, пробуем установить напрямую
                 this.originalImg.src = url;
                 reject(new Error('Не удалось загрузить изображение'));
             };
             
-            // Начинаем загрузку
             img.src = url;
         });
     }
 
-    resetToDefaults() {
-        const defaultDivider = 15;
-        const defaultColors = 15;
-        
-        if (this.divider === defaultDivider && this.nColors === defaultColors) {
-            return;
-        }
-        
-        this.dividerSlider.value = defaultDivider;
-        this.dividerInput.value = defaultDivider;
-        this.colorsSlider.value = defaultColors;
-        this.colorsInput.value = defaultColors;
-
-        this.triggerRefresh(defaultDivider, defaultColors);
-    }
-
-    triggerRefresh(divider, nColors) {
-        if (divider === this.divider && nColors === this.nColors) {
-            return;
-        }
-
-        const oldDivider = this.divider;
-        const oldNColors = this.nColors;
-        
-        this.divider = divider;
-        this.nColors = nColors;
-        
-        // Обновляем UI сразу (оптимистично)
-        this.dividerSlider.value = divider;
-        this.dividerInput.value = divider;
-        this.colorsSlider.value = nColors;
-        this.colorsInput.value = nColors;
-        
-        this.refreshScheme(divider, nColors).catch(() => {
-            // Откат при ошибке
-            this.divider = oldDivider;
-            this.nColors = oldNColors;
-            this.dividerSlider.value = oldDivider;
-            this.dividerInput.value = oldDivider;
-            this.colorsSlider.value = oldNColors;
-            this.colorsInput.value = oldNColors;
-        });
-    }
-
-    async refreshScheme(divider, nColors) {
-        if (this.isLoading) return;
-        
-        this.isLoading = true;
-        this.setLoadingState(true);
-        
-        try {
-            const payload = {
-                image_hash: this.currentImageHash,
-                divider: divider,
-                n_colors: nColors
-            };
-            
-            const response = await fetch('/api/v1/mosaic/refresh-scheme', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Ошибка сервера');
-            }
-            
-            const newScheme = await response.json();
-            
-            // Обновляем схему
-            this.scheme = newScheme;
-            
-            // Обновляем UI (значения уже обновлены в triggerRefresh)
-            this.dividerSlider.value = this.divider;
-            this.dividerInput.value = this.divider;
-            this.colorsSlider.value = this.nColors;
-            this.colorsInput.value = this.nColors;
-            
-            // Перерисовываем
-            this.drawMosaic(newScheme);
-            this.renderPalette(newScheme);
-            
-            this.mosaicStatus.textContent = 'Обновлено';
-            this.mosaicStatus.className = 'badge bg-success';
-            
-        } catch (error) {
-            console.error('Ошибка обновления схемы:', error);
-            this.mosaicStatus.textContent = 'Ошибка';
-            this.mosaicStatus.className = 'badge bg-danger';
-            throw error;
-        } finally {
-            this.isLoading = false;
-            this.setLoadingState(false);
-        }
-    }
-
     drawMosaic(scheme) {
-        const divider = this.divider;
         const grid = scheme.grid;
         const gridWidth = grid.width;
         const gridHeight = grid.height;
         
-        if (!gridWidth || !gridHeight || !divider) {
-            console.error('Невалидные размеры сетки:', { gridWidth, gridHeight, divider });
+        if (!gridWidth || !gridHeight) {
+            console.error('Невалидные размеры сетки:', { gridWidth, gridHeight });
             return;
         }
         
-        const canvasWidth = Math.floor(gridWidth * divider);
-        const canvasHeight = Math.floor(gridHeight * divider);
+        const divider = Math.min(
+            Math.floor(this.originalImg.naturalWidth / gridWidth),
+            Math.floor(this.originalImg.naturalHeight / gridHeight)
+        );
+        
+        if (divider < 1) {
+            console.error('Divider должен быть > 0:', divider);
+            return;
+        }
+        
+        const canvasWidth = gridWidth * divider;
+        const canvasHeight = gridHeight * divider;
         
         if (canvasWidth <= 0 || canvasHeight <= 0) {
             console.error('Размеры канваса должны быть > 0:', { canvasWidth, canvasHeight });
@@ -492,7 +632,6 @@ class MosaicApp {
         const imageData = this.ctx.createImageData(canvasWidth, canvasHeight);
         const data = imageData.data;
         
-        // Белый фон
         for (let i = 0; i < data.length; i += 4) {
             data[i] = 255;
             data[i + 1] = 255;
@@ -507,10 +646,8 @@ class MosaicApp {
             const rgb = this.hexToRgb(colorHex);
             const maskBase64 = cluster.mask;
             
-            // Декодируем маску
             const maskBytes = this.decodeMask(maskBase64);
             
-            // Проверяем размер маски
             const expectedBytes = Math.floor((totalCells + 7) / 8);
             if (maskBytes.length !== expectedBytes) {
                 console.warn(`Размер маски не совпадает: ожидается ${expectedBytes}, получено ${maskBytes.length}`);
@@ -550,14 +687,12 @@ class MosaicApp {
     }
 
     decodeMask(base64Str) {
-        // 1. Декодируем Base64 в бинарные данные
         const binary = atob(base64Str);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
             bytes[i] = binary.charCodeAt(i);
         }
         
-        // 2. Распаковываем ZLIB (первый байт 0x78 — признак ZLIB)
         if (bytes.length > 0 && bytes[0] === 0x78) {
             try {
                 if (typeof pako !== 'undefined') {
@@ -578,40 +713,39 @@ class MosaicApp {
 
     renderPalette(scheme) {
         const clusters = scheme.clusters;
+        const nColors = scheme.n_colors;
+        
+        const paletteHeader = document.querySelector('.card-header h5');
+        if (paletteHeader && paletteHeader.textContent.includes('🎨 Палитра цветов')) {
+            paletteHeader.textContent = `🎨 Палитра (${nColors} цветов)`;
+        }
         
         this.colorPalette.innerHTML = '';
         
-        // Сортируем по убыванию количества
         const sortedClusters = [...clusters].sort((a, b) => b.count - a.count);
         
         for (const cluster of sortedClusters) {
             const colorHex = cluster.color;
             const count = cluster.count;
             
-            // Создаём элемент
             const item = document.createElement('div');
             item.className = 'color-palette-item';
             
-            // Прямоугольник цвета
             const colorBox = document.createElement('div');
             colorBox.className = 'color-box';
             colorBox.style.backgroundColor = `#${colorHex}`;
             
-            // Контейнер для текста (две строки)
             const infoContainer = document.createElement('div');
             infoContainer.className = 'color-info';
             
-            // Строка 1: Цвет: #123ABC
             const hexLabel = document.createElement('div');
             hexLabel.className = 'color-hex';
             hexLabel.textContent = `Цвет: #${colorHex}`;
             
-            // Строка 2: Количество: 123
             const countLabel = document.createElement('div');
             countLabel.className = 'color-count';
             countLabel.textContent = `Количество: ${count}`;
             
-            // Собираем
             infoContainer.appendChild(hexLabel);
             infoContainer.appendChild(countLabel);
             
@@ -633,51 +767,73 @@ class MosaicApp {
         ];
     }
 
+    updateSummary(scheme) {
+        const gridWidth = scheme.grid.width;
+        const gridHeight = scheme.grid.height;
+        
+        if (this.summaryCanvasWidth) {
+            this.summaryCanvasWidth.textContent = scheme.actual_size.width_mm + ' мм';
+        }
+        if (this.summaryCanvasHeight) {
+            this.summaryCanvasHeight.textContent = scheme.actual_size.height_mm + ' мм ~ ' + scheme.area_m2 + ' м²';
+        }
+        if (this.summaryCellSize) {
+            this.summaryCellSize.textContent = scheme.cell_size_mm + '×' + scheme.cell_size_mm + ' мм';
+        }
+        if (this.summaryTotalCells) {
+            this.summaryTotalCells.textContent = gridWidth + ' x ' + gridHeight + ' = ' + scheme.total_cells;
+        }
+        if (this.summaryGap) {
+            this.summaryGap.textContent = scheme.gap_mm + ' мм';
+        }
+    }
+
     setLoadingState(loading) {
         if (loading) {
-            // Показываем спиннеры на обоих изображениях
             this.imageLoadingOverlay.classList.remove('d-none');
             this.imageLoadingOverlay.classList.add('d-flex');
             this.mosaicLoadingOverlay.classList.remove('d-none');
             this.mosaicLoadingOverlay.classList.add('d-flex');
             
-            // Блокируем все элементы управления
-            this.dividerSlider.disabled = true;
-            this.dividerInput.disabled = true;
+            this.canvasWidthSlider.disabled = true;
+            this.canvasWidthInput.disabled = true;
+            this.cellSizeSlider.disabled = true;
+            this.cellSizeInput.disabled = true;
+            this.gapSlider.disabled = true;
+            this.gapInput.disabled = true;
             this.colorsSlider.disabled = true;
             this.colorsInput.disabled = true;
             this.uploadBtn.disabled = true;
             this.resetBtn.disabled = true;
             this.resetImageBtn.disabled = true;
             
-            // Блокируем DnD
             this.dropZone.style.pointerEvents = 'none';
             this.dropZone.style.opacity = '0.6';
             
         } else {
-            // Скрываем спиннеры
             this.imageLoadingOverlay.classList.add('d-none');
             this.imageLoadingOverlay.classList.remove('d-flex');
             this.mosaicLoadingOverlay.classList.add('d-none');
             this.mosaicLoadingOverlay.classList.remove('d-flex');
             
-            // Разблокируем все элементы управления
-            this.dividerSlider.disabled = false;
-            this.dividerInput.disabled = false;
+            this.canvasWidthSlider.disabled = false;
+            this.canvasWidthInput.disabled = false;
+            this.cellSizeSlider.disabled = false;
+            this.cellSizeInput.disabled = false;
+            this.gapSlider.disabled = false;
+            this.gapInput.disabled = false;
             this.colorsSlider.disabled = false;
             this.colorsInput.disabled = false;
             this.uploadBtn.disabled = false;
             this.resetBtn.disabled = false;
             this.resetImageBtn.disabled = false;
             
-            // Разблокируем DnD
             this.dropZone.style.pointerEvents = 'auto';
             this.dropZone.style.opacity = '1';
         }
     }
 }
 
-// Инициализация
 document.addEventListener('DOMContentLoaded', () => {
     if (window.__initialData) {
         window.app = new MosaicApp(window.__initialData);

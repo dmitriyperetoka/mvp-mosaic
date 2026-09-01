@@ -23,7 +23,6 @@ UPLOADS_DIR = BASE_DIR / 'uploads'
 TEMPLATES_DIR = BASE_DIR / 'app' / 'templates'
 DEFAULT_IMAGE_FP = STATIC_DIR / 'default_image.jpg'
 
-# Создаем все необходимые директории
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
@@ -54,7 +53,6 @@ image_cache = {}  # {hash: numpy_array}
 logger = logging.getLogger()
 app = FastAPI()
 
-# Монтируем обе папки для статической отдачи
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
@@ -98,25 +96,28 @@ def store_image(image_bytes: bytes) -> str:
     return image_hash
 
 
-def get_mosaic_scheme(img_hash: str, divider: int, n_colors: int):
+def get_mosaic_scheme(
+    img_hash: str,
+    canvas_width_mm: int,
+    cell_size_mm: int,
+    gap_mm: int,
+    n_colors: int
+):
     img = get_image_by_hash(img_hash)
     if img is None:
         raise HTTPException(status_code=404, detail='Изображение не найдено')
 
-    img_height, img_width = img.shape[:2]
-    grid_h = img_height // divider
-    grid_w = img_width // divider
-    cache_key = f"{img_hash}_{grid_h}x{grid_w}_c{n_colors}"
+    cache_key = f"{img_hash}_cw{canvas_width_mm}_c{cell_size_mm}_g{gap_mm}_n{n_colors}"
 
     if cache_key in mosaic_scheme_cache:
         return mosaic_scheme_cache[cache_key]
 
     scheme = img_proc.make_mosaic_scheme(
         img=img,
-        grid_h=grid_h,
-        grid_w=grid_w,
+        canvas_width_mm=canvas_width_mm,
+        cell_size_mm=cell_size_mm,
+        gap_mm=gap_mm,
         n_colors=n_colors,
-        divider=divider,
         image_hash=img_hash
     )
     mosaic_scheme_cache[cache_key] = scheme
@@ -126,7 +127,13 @@ def get_mosaic_scheme(img_hash: str, divider: int, n_colors: int):
 
 @app.get("/")
 async def get_index(request: Request):
-    scheme = get_mosaic_scheme(default_image_hash, divider=15, n_colors=15)
+    scheme = get_mosaic_scheme(
+        default_image_hash,
+        canvas_width_mm=1000,
+        cell_size_mm=15,
+        gap_mm=2,
+        n_colors=15
+    )
     return templates.TemplateResponse(
         request,
         "image_page.html",
@@ -145,7 +152,13 @@ async def health():
 @app.post('/api/v1/mosaic/refresh-scheme')
 async def refresh_scheme(request: validators.MosaicRefreshSchemeRequest):
     try:
-        scheme = get_mosaic_scheme(request.image_hash, request.divider, request.n_colors)
+        scheme = get_mosaic_scheme(
+            request.image_hash,
+            request.canvas_width_mm,
+            request.cell_size_mm,
+            request.gap_mm,
+            request.n_colors
+        )
         return JSONResponse(content=scheme)
     except HTTPException:
         raise
@@ -157,7 +170,9 @@ async def refresh_scheme(request: validators.MosaicRefreshSchemeRequest):
 @app.post('/api/v1/upload-image')
 async def upload_image(
     file: UploadFile = File(...),
-    divider: int = Form(15),
+    canvas_width_mm: int = Form(1000),
+    cell_size_mm: int = Form(15),
+    gap_mm: int = Form(2),
     n_colors: int = Form(15)
 ):
     if file.content_type is None or not file.content_type.startswith('image/'):
@@ -170,10 +185,16 @@ async def upload_image(
     try:
         image_hash = store_image(content)
         
-        scheme = get_mosaic_scheme(image_hash, divider, n_colors)
+        scheme = get_mosaic_scheme(
+            image_hash,
+            canvas_width_mm,
+            cell_size_mm,
+            gap_mm,
+            n_colors
+        )
         
         return JSONResponse(content={
-            "image_url": f"/uploads/{image_hash}.jpg",  # Изменено на /uploads/
+            "image_url": f"/uploads/{image_hash}.jpg",
             "scheme": scheme
         })
 
@@ -184,14 +205,22 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Ошибка обработки изображения")
 
 
-@app.post('/api/v1/reset-to-default')
+@app.post('/api/v1/reset-to-default-image')
 async def reset_to_default(
-    divider: int = Form(15),
+    canvas_width_mm: int = Form(1000),
+    cell_size_mm: int = Form(15),
+    gap_mm: int = Form(2),
     n_colors: int = Form(15)
 ):
     """Сброс к дефолтному изображению с текущими настройками"""
     try:
-        scheme = get_mosaic_scheme(default_image_hash, divider, n_colors)
+        scheme = get_mosaic_scheme(
+            default_image_hash,
+            canvas_width_mm,
+            cell_size_mm,
+            gap_mm,
+            n_colors
+        )
 
         return JSONResponse(content={
             "image_url": "/static/default_image.jpg",

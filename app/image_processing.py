@@ -1,6 +1,7 @@
 import base64
 import typing
 import zlib
+import math
 
 import cv2
 import numpy as np
@@ -10,15 +11,50 @@ def bgr_to_rgb_hex(b: int, g: int, r: int) -> str:
     return f'{r:02x}{g:02x}{b:02x}'
 
 
+def calculate_grid_from_physical(
+    img_shape: tuple,
+    canvas_width_mm: int,
+    cell_size_mm: int,
+    gap_mm: int
+) -> tuple[int, int, int, int]:
+    """
+    Рассчитывает размеры сетки на основе физических размеров.
+    Возвращает: (grid_w, grid_h, divider, actual_width_mm, actual_height_mm)
+    """
+    img_height, img_width = img_shape[:2]
+    aspect_ratio = img_width / img_height
+    
+    step = cell_size_mm + gap_mm
+    
+    if canvas_width_mm < 200:
+        canvas_width_mm = 200
+    
+    grid_w = max(1, math.ceil(canvas_width_mm / step))
+    canvas_height_mm = canvas_width_mm / aspect_ratio
+    grid_h = max(1, math.ceil(canvas_height_mm / step))
+    
+    actual_width_mm = grid_w * cell_size_mm + (grid_w - 1) * gap_mm
+    actual_height_mm = grid_h * cell_size_mm + (grid_h - 1) * gap_mm
+
+    return grid_w, grid_h, actual_width_mm, actual_height_mm
+
+
 def make_mosaic_scheme(
     img: np.ndarray,
-    grid_h: int,
-    grid_w: int,
+    canvas_width_mm: int,
+    cell_size_mm: int,
+    gap_mm: int,
     n_colors: int,
-    divider: int,
     image_hash: str
     
 ) -> dict[str, typing.Any]:
+    grid_w, grid_h, actual_width_mm, actual_height_mm = calculate_grid_from_physical(
+        img.shape,
+        canvas_width_mm,
+        cell_size_mm,
+        gap_mm
+    )
+
     resized = cv2.resize(img, (grid_w, grid_h), interpolation=cv2.INTER_AREA)
     avg_colors = resized.reshape(-1, 3).astype(np.float32)
     
@@ -61,8 +97,16 @@ def make_mosaic_scheme(
 
     return {
         "image_hash": image_hash,
-        "divider": divider,
+        "canvas_width_mm": canvas_width_mm,
+        "cell_size_mm": cell_size_mm,
+        "gap_mm": gap_mm,
         "n_colors": n_colors,
         "grid": {"width": grid_w, "height": grid_h},
+        "actual_size": {
+            "width_mm": actual_width_mm,
+            "height_mm": actual_height_mm
+        },
+        "area_m2": round((actual_width_mm * actual_height_mm) / 1000000, 3),
+        "total_cells": total_cells,
         "clusters": result_clusters
     }
