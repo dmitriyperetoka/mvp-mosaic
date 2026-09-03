@@ -327,3 +327,34 @@ body {
         height: 40px;
     }
 }
+/* В конце файла style.css добавьте: */
+
+@media (max-width: 576px) {
+    .card-header {
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 15px;
+    }
+    
+    .card-header h5 {
+        font-size: 0.9rem;
+        margin-bottom: 0;
+        width: 100%;
+    }
+    
+    .card-header .d-flex {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 6px;
+    }
+    
+    #resetImageBtn,
+    #uploadBtn {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+    }
+    
+    #resetImageBtn {
+        white-space: normal;
+    }
+}
