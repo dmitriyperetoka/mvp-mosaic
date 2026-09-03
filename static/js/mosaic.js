@@ -58,9 +58,18 @@ class MosaicApp {
         this.gapMm = this.scheme.gap_mm;
         this.nColors = this.scheme.n_colors;
 
-        this.drawMosaic(this.scheme);
-        this.renderPalette(this.scheme);
-        this.updateSummary(this.scheme);
+        if (this.originalImg.complete && this.originalImg.naturalWidth > 0) {
+            this.drawMosaic(this.scheme);
+            this.renderPalette(this.scheme);
+            this.updateSummary(this.scheme);
+        } else {
+            this.originalImg.onload = () => {
+                this.drawMosaic(this.scheme);
+                this.renderPalette(this.scheme);
+                this.updateSummary(this.scheme);
+            };
+        }
+
         this.bindEvents();
     }
 
